@@ -31,7 +31,6 @@ private:
     bool m_isOpen;
     std::string m_queuePath;
     std::string m_indexPath;
-    boost::mutex mutex;
 };
 
 #endif // DBQUEUE_H

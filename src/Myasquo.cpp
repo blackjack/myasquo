@@ -73,7 +73,13 @@ void MysqlAsync::doOpenQueue() {
 
 void MysqlAsync::doQuery(const std::string& msg)
 {
-    m_writeBuffer.push_back(msg);
+    if (m_connected)
+        m_writeBuffer.push_back(msg);
+    else
+        if (!m_dbQueue.push(msg)) {
+            onLogMessage("Could not push query queue item: "+std::string(strerror(errno)));
+            m_dbQueue.close();
+        }
     if (m_connected && !m_writeInProgress) {
         executeQuery();
     }
