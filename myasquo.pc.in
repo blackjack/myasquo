@@ -1,0 +1,10 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=${prefix}
+libdir=@LIB_INSTALL_DIR@
+includedir=@INCLUDE_INSTALL_DIR@
+
+Name: myasquo
+Description: myasquo is an asynchronous Mysql library with ability to store not executed queries in FIFO queue
+Version: @MYASQUO_LIB_MAJOR_VERSION@.@MYASQUO_LIB_MINOR_VERSION@.@MYASQUO_LIB_PATCH_VERSION@
+Libs: -L${libdir} -lmyasquo
+Cflags: -I${includedir}
