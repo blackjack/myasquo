@@ -9,20 +9,21 @@
 #include <mysql/mysql.h>
 #include "DBQueue.h"
 
-class event_base;
-
 class MysqlAsync
 {
 public:
     MysqlAsync(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath);
-    void query(const std::string &query);
     ~MysqlAsync();
-    virtual void onLogMessage(const std::string) {}
+
+    void query(const std::string &query);
+    void ping();
+    virtual void onLogMessage(const std::string& message) {}
     virtual void onError();
 private:
     void doConnect();
     void doOpenQueue();
     void doQuery(const std::string &msg);
+    void doPing();
     void executeQuery();
 private:
     std::string m_hostname;
@@ -37,8 +38,11 @@ private:
     MYSQL* m_conn;
     boost::thread m_thread;
     boost::asio::io_service m_ioService;
+    boost::asio::io_service::work m_work;
     boost::asio::deadline_timer m_reconnectTimer;
     boost::asio::deadline_timer m_reopenTimer;
+    bool m_reconnectTimerActive;
+    bool m_reopenTimerActive;
 
     std::deque<std::string> m_writeBuffer;
     DBQueue m_dbQueue;

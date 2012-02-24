@@ -38,12 +38,13 @@ bool DBQueue::open(const std::string& path)
     m_file.open(m_queuePath.c_str(),std::ios_base::in);
 
     m_file.seekg(0,std::ios_base::end);
-    std::fstream::pos_type t = m_file.tellg();
+    int t = m_file.tellg();
     if (t == m_seek) {
         m_empty = true;
         reopenQueue(std::ios_base::out | std::ios_base::trunc);
     } else {
         m_empty = false;
+        reopenQueue(std::ios_base::out | std::ios_base::app);
         if (m_seek > 0)
             m_file.seekg(m_seek);
         else
@@ -94,7 +95,7 @@ bool DBQueue::pop()
         return false;
 
     m_file.seekg(0,std::ios_base::end);
-    std::fstream::pos_type t = m_file.tellg();
+    int t = m_file.tellg();
     if (t == m_seek) {
         m_empty = true;
         if (!setSeek(0) || !reopenQueue(std::ios_base::out | std::ios_base::trunc))
@@ -119,13 +120,14 @@ std::string DBQueue::front()
     }
 
 
-    std::fstream::pos_type t = m_file.tellg();
+    int t = m_file.tellg();
     std::string result;
     std::getline(m_file,result);
     m_file.seekg(t);
 
     if (m_file.bad())
         return std::string();
+    return result;
 }
 
 bool DBQueue::setSeek(int seek)
@@ -133,9 +135,10 @@ bool DBQueue::setSeek(int seek)
     m_indexFile.open(m_indexPath.c_str(),std::ios_base::out | std::ios_base::trunc);
     if (!m_indexFile) return false;
     m_indexFile << seek;
+    if (m_indexFile.bad()) return false;
     m_indexFile.close();
     m_seek = seek;
-    return !m_indexFile.bad();
+    return true;
 }
 
 bool DBQueue::reopenQueue(std::ios_base::openmode mode)

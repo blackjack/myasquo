@@ -11,17 +11,22 @@ MysqlAsync::MysqlAsync(const std::string& hostname, int port, const std::string&
     m_dbQueuePath(queuePath),
     m_connected(false),
     m_writeInProgress(false),
+    m_work(m_ioService),
     m_reconnectTimer(m_ioService),
-    m_reopenTimer(m_ioService)
+    m_reopenTimer(m_ioService),
+    m_reconnectTimerActive(false),
+    m_reopenTimerActive(false)
 {
     m_conn = mysql_init(NULL);
+    if (!m_conn) throw std::runtime_error("Not enough memory to allocate MySQL");
     m_conn->free_me = 1;
+    m_conn->reconnect = 0;
 
     if (!m_dbQueue.open(queuePath))
         throw std::runtime_error("Could not open query queue: "+std::string(strerror(errno)));
 
-    m_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_ioService));
     m_ioService.post(boost::bind(&MysqlAsync::doConnect,this));
+    m_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_ioService));
 }
 
 MysqlAsync::~MysqlAsync()
@@ -35,13 +40,30 @@ MysqlAsync::~MysqlAsync()
 
 void MysqlAsync::onError()
 {
-    if (!m_dbQueue.is_open() && !m_dbQueue.open(m_dbQueuePath)) {
-        m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
-        m_reopenTimer.async_wait(boost::bind(&MysqlAsync::doConnect, this));
+    static bool startReopenTimer = false;
+    static bool startReconnectTimer = false;
+
+    if (!m_dbQueue.is_open() && !m_reopenTimerActive) {
+        if (!startReopenTimer) {
+            startReopenTimer = true;
+            doOpenQueue();
+        } else {
+            m_reopenTimerActive = true;
+            startReopenTimer = false;
+            m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
+            m_reopenTimer.async_wait(boost::bind(&MysqlAsync::doOpenQueue, this));
+        }
     }
-    if (!m_connected) {
-        m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
-        m_reconnectTimer.async_wait(boost::bind(&MysqlAsync::doConnect, this));
+    if (!m_connected && !m_reconnectTimerActive) {
+        if (!startReconnectTimer) {
+            startReconnectTimer = true;
+            doConnect();
+        } else {
+            startReconnectTimer = false;
+            m_reconnectTimerActive = true;
+            m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
+            m_reconnectTimer.async_wait(boost::bind(&MysqlAsync::doConnect, this));
+        }
     }
 }
 
@@ -50,20 +72,28 @@ void MysqlAsync::query(const std::string &query)
     m_ioService.post(boost::bind(&MysqlAsync::doQuery, this, query));
 }
 
+void MysqlAsync::ping()
+{
+    m_ioService.post(boost::bind(&MysqlAsync::doPing, this));
+}
+
 
 void MysqlAsync::doConnect()
 {
-    if (!mysql_real_connect(m_conn, m_hostname.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, 0)) {
+    m_reconnectTimerActive = false;
+    if (!mysql_real_connect(m_conn, m_hostname.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, CLIENT_INTERACTIVE)) {
         onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
         m_connected = false;
         onError();
+        return;
     }
     m_connected = true;
-    if (!m_writeBuffer.empty())
+    if (!m_dbQueue.empty() || !m_writeBuffer.empty())
         executeQuery();
 }
 
 void MysqlAsync::doOpenQueue() {
+    m_reopenTimerActive = false;
     if (!m_dbQueue.open(m_dbQueuePath)) {
         onLogMessage("Could not open query queue: "+std::string(strerror(errno)));
         onError();
@@ -82,6 +112,15 @@ void MysqlAsync::doQuery(const std::string& msg)
         }
     if (m_connected && !m_writeInProgress) {
         executeQuery();
+    }
+}
+
+void MysqlAsync::doPing()
+{
+    if (mysql_ping(m_conn) != 0) {
+        onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
+        m_connected = false;
+        onError();
     }
 }
 
@@ -119,6 +158,10 @@ void MysqlAsync::executeQuery()
         onError();
         return;
     }
+
+    MYSQL_RES* result = mysql_store_result(m_conn);
+    if (result)
+        mysql_free_result(result);
 
     if (!m_dbQueue.empty()) {
         if (!m_dbQueue.pop()) {
