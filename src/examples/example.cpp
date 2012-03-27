@@ -1,11 +1,11 @@
 #include "../Myasquo.h"
 #include <iostream>
 
-class MyClient: public MysqlAsync
+class MyClient: public Myasquo
 {
 public:
     MyClient(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath):
-        MysqlAsync(hostname,port,username,password,database,queuePath)
+        Myasquo(hostname,port,username,password,database,queuePath)
     {}
     void onLogMessage(const std::string &message) {
         std::cout << message << std::endl;

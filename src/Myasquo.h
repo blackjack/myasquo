@@ -6,20 +6,23 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/thread.hpp>
-#include <mysql/mysql.h>
 #include "DBQueue.h"
 
-class MysqlAsync
+typedef struct st_mysql MYSQL;
+
+class Myasquo
 {
 public:
-    MysqlAsync(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath);
-    ~MysqlAsync();
+    Myasquo(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath);
+    ~Myasquo();
 
     void query(const std::string &query);
     void ping();
+    virtual void onConnect() {}
     virtual void onLogMessage(const std::string& message) {}
     virtual void onError();
-private:
+protected:
+    boost::asio::io_service& ioService() { return m_ioService; }
     void doConnect();
     void doOpenQueue();
     void doQuery(const std::string &msg);
@@ -43,6 +46,8 @@ private:
     boost::asio::deadline_timer m_reopenTimer;
     bool m_reconnectTimerActive;
     bool m_reopenTimerActive;
+    bool m_startReopenTimer;
+    bool m_startReconnectTimer;
 
     std::deque<std::string> m_writeBuffer;
     DBQueue m_dbQueue;

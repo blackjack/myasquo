@@ -1,8 +1,8 @@
 #include "Myasquo.h"
 #include <string>
-#include "event.h"
+#include <mysql/mysql.h>
 
-MysqlAsync::MysqlAsync(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath):
+Myasquo::Myasquo(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath):
     m_hostname(hostname),
     m_port(port),
     m_username(username),
@@ -15,7 +15,9 @@ MysqlAsync::MysqlAsync(const std::string& hostname, int port, const std::string&
     m_reconnectTimer(m_ioService),
     m_reopenTimer(m_ioService),
     m_reconnectTimerActive(false),
-    m_reopenTimerActive(false)
+    m_reopenTimerActive(false),
+    m_startReopenTimer(false),
+    m_startReconnectTimer(false)
 {
     m_conn = mysql_init(NULL);
     if (!m_conn) throw std::runtime_error("Not enough memory to allocate MySQL");
@@ -23,13 +25,13 @@ MysqlAsync::MysqlAsync(const std::string& hostname, int port, const std::string&
     m_conn->reconnect = 0;
 
     if (!m_dbQueue.open(queuePath))
-        throw std::runtime_error("Could not open query queue: "+std::string(strerror(errno)));
+        throw std::runtime_error(m_dbQueue.lastError());
 
-    m_ioService.post(boost::bind(&MysqlAsync::doConnect,this));
+    m_ioService.post(boost::bind(&Myasquo::doConnect,this));
     m_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_ioService));
 }
 
-MysqlAsync::~MysqlAsync()
+Myasquo::~Myasquo()
 {
     m_reopenTimer.cancel();
     m_reconnectTimer.cancel();
@@ -38,47 +40,54 @@ MysqlAsync::~MysqlAsync()
     m_thread.join();
 }
 
-void MysqlAsync::onError()
+void Myasquo::onError()
 {
-    static bool startReopenTimer = false;
-    static bool startReconnectTimer = false;
-
-    if (!m_dbQueue.is_open() && !m_reopenTimerActive) {
-        if (!startReopenTimer) {
-            startReopenTimer = true;
-            doOpenQueue();
-        } else {
-            m_reopenTimerActive = true;
-            startReopenTimer = false;
-            m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
-            m_reopenTimer.async_wait(boost::bind(&MysqlAsync::doOpenQueue, this));
+    if (!m_dbQueue.is_open()) {
+        if (!m_reopenTimerActive) {
+            if (!m_startReopenTimer) {
+                m_startReopenTimer = true;
+                doOpenQueue();
+            } else {
+                m_reopenTimerActive = true;
+                m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
+                m_reopenTimer.async_wait(boost::bind(&Myasquo::doOpenQueue, this));
+            }
+        }
+    } else if (!m_connected) {
+        while (!m_writeBuffer.empty()) {
+            if (!m_dbQueue.push(m_writeBuffer.front())) {
+                m_dbQueue.close();
+                m_reopenTimer.async_wait(boost::bind(&Myasquo::onError, this));
+                break;
+            } else
+                m_writeBuffer.pop_front();
         }
     }
+
     if (!m_connected && !m_reconnectTimerActive) {
-        if (!startReconnectTimer) {
-            startReconnectTimer = true;
+        if (!m_startReconnectTimer) {
+            m_startReconnectTimer = true;
             doConnect();
         } else {
-            startReconnectTimer = false;
             m_reconnectTimerActive = true;
             m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
-            m_reconnectTimer.async_wait(boost::bind(&MysqlAsync::doConnect, this));
+            m_reconnectTimer.async_wait(boost::bind(&Myasquo::doConnect, this));
         }
     }
 }
 
-void MysqlAsync::query(const std::string &query)
+void Myasquo::query(const std::string &query)
 {
-    m_ioService.post(boost::bind(&MysqlAsync::doQuery, this, query));
+    m_ioService.post(boost::bind(&Myasquo::doQuery, this, query));
 }
 
-void MysqlAsync::ping()
+void Myasquo::ping()
 {
-    m_ioService.post(boost::bind(&MysqlAsync::doPing, this));
+    m_ioService.post(boost::bind(&Myasquo::doPing, this));
 }
 
 
-void MysqlAsync::doConnect()
+void Myasquo::doConnect()
 {
     m_reconnectTimerActive = false;
     if (!mysql_real_connect(m_conn, m_hostname.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, CLIENT_INTERACTIVE)) {
@@ -88,26 +97,42 @@ void MysqlAsync::doConnect()
         return;
     }
     m_connected = true;
+
+    m_startReconnectTimer = false;
     if (!m_dbQueue.empty() || !m_writeBuffer.empty())
         executeQuery();
+
+    onConnect();
 }
 
-void MysqlAsync::doOpenQueue() {
+void Myasquo::doOpenQueue() {
     m_reopenTimerActive = false;
     if (!m_dbQueue.open(m_dbQueuePath)) {
-        onLogMessage("Could not open query queue: "+std::string(strerror(errno)));
+        onLogMessage(m_dbQueue.lastError());
         onError();
-    } else if (m_connected && !m_writeInProgress)
-        executeQuery();
+    } else {
+        m_startReopenTimer = false;
+        while (!m_writeBuffer.empty()) {
+            if (!m_dbQueue.push(m_writeBuffer.front())) {
+                onLogMessage(m_dbQueue.lastError());
+                m_dbQueue.close();
+                onError();
+                break;
+            } else
+                m_writeBuffer.pop_front();
+        }
+        if (m_connected && !m_writeInProgress)
+            executeQuery();
+    }
 }
 
-void MysqlAsync::doQuery(const std::string& msg)
+void Myasquo::doQuery(const std::string& msg)
 {
     if (m_connected)
         m_writeBuffer.push_back(msg);
     else
         if (!m_dbQueue.push(msg)) {
-            onLogMessage("Could not push query queue item: "+std::string(strerror(errno)));
+            onLogMessage(m_dbQueue.lastError());
             m_dbQueue.close();
         }
     if (m_connected && !m_writeInProgress) {
@@ -115,7 +140,7 @@ void MysqlAsync::doQuery(const std::string& msg)
     }
 }
 
-void MysqlAsync::doPing()
+void Myasquo::doPing()
 {
     if (mysql_ping(m_conn) != 0) {
         onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
@@ -124,7 +149,7 @@ void MysqlAsync::doPing()
     }
 }
 
-void MysqlAsync::executeQuery()
+void Myasquo::executeQuery()
 {
     m_writeInProgress = true;
 
@@ -132,7 +157,7 @@ void MysqlAsync::executeQuery()
     if (!m_dbQueue.empty()) {
         msg = m_dbQueue.front();
         if (msg.empty()) {
-            onLogMessage("Could not get query queue item: "+std::string(strerror(errno)));
+            onLogMessage(m_dbQueue.lastError());
             m_dbQueue.close();
             m_writeInProgress = false;
             onError();
@@ -150,7 +175,7 @@ void MysqlAsync::executeQuery()
         m_writeInProgress = false;
         if (m_dbQueue.empty()) {//query taken from m_writeBuffer
             if (!m_dbQueue.push(msg)) {
-                onLogMessage("Could not push query queue item: "+std::string(strerror(errno)));
+                onLogMessage(m_dbQueue.lastError());
                 m_dbQueue.close();
             }
         }
@@ -165,7 +190,7 @@ void MysqlAsync::executeQuery()
 
     if (!m_dbQueue.empty()) {
         if (!m_dbQueue.pop()) {
-            onLogMessage("Could not pop query queue item: "+std::string(strerror(errno)));
+            onLogMessage(m_dbQueue.lastError());
             m_dbQueue.close();
             m_writeInProgress = false;
             onError();
@@ -182,5 +207,5 @@ void MysqlAsync::executeQuery()
             return;
         }
     }
-    m_ioService.post(boost::bind(&MysqlAsync::executeQuery, this));
+    m_ioService.post(boost::bind(&Myasquo::executeQuery, this));
 }

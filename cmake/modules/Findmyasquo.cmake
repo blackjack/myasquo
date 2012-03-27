@@ -30,7 +30,7 @@ else (MYASQUO_INCLUDE_DIR AND MYASQUO_LIBRARIES)
 
   find_path (MYASQUO_INCLUDE_DIR
     NAMES
-    myasquo.h
+    Myasquo.h
     PATH_SUFFIXES
     myasquo
     PATHS
