@@ -20,7 +20,7 @@ public:
     void ping();
     virtual void onConnect() {}
     virtual void onLogMessage(const std::string& message) {}
-    virtual void onError();
+    virtual void onError() {}
 protected:
     boost::asio::io_service& ioService() { return m_ioService; }
     void doConnect();
@@ -28,6 +28,7 @@ protected:
     void doQuery(const std::string &msg);
     void doPing();
     void executeQuery();
+    void handleError();
 private:
     std::string m_hostname;
     int m_port;

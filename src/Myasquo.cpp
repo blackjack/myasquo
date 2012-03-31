@@ -40,12 +40,13 @@ Myasquo::~Myasquo()
     m_thread.join();
 }
 
-void Myasquo::onError()
+void Myasquo::handleError()
 {
     if (!m_dbQueue.is_open()) {
         if (!m_reopenTimerActive) {
             if (!m_startReopenTimer) {
                 m_startReopenTimer = true;
+                onError();
                 doOpenQueue();
             } else {
                 m_reopenTimerActive = true;
@@ -57,7 +58,7 @@ void Myasquo::onError()
         while (!m_writeBuffer.empty()) {
             if (!m_dbQueue.push(m_writeBuffer.front())) {
                 m_dbQueue.close();
-                m_reopenTimer.async_wait(boost::bind(&Myasquo::onError, this));
+                m_reopenTimer.async_wait(boost::bind(&Myasquo::handleError, this));
                 break;
             } else
                 m_writeBuffer.pop_front();
@@ -67,6 +68,7 @@ void Myasquo::onError()
     if (!m_connected && !m_reconnectTimerActive) {
         if (!m_startReconnectTimer) {
             m_startReconnectTimer = true;
+            onError();
             doConnect();
         } else {
             m_reconnectTimerActive = true;
@@ -93,7 +95,7 @@ void Myasquo::doConnect()
     if (!mysql_real_connect(m_conn, m_hostname.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, CLIENT_INTERACTIVE)) {
         onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
         m_connected = false;
-        onError();
+        handleError();
         return;
     }
     m_connected = true;
@@ -109,14 +111,14 @@ void Myasquo::doOpenQueue() {
     m_reopenTimerActive = false;
     if (!m_dbQueue.open(m_dbQueuePath)) {
         onLogMessage(m_dbQueue.lastError());
-        onError();
+        handleError();
     } else {
         m_startReopenTimer = false;
         while (!m_writeBuffer.empty()) {
             if (!m_dbQueue.push(m_writeBuffer.front())) {
                 onLogMessage(m_dbQueue.lastError());
                 m_dbQueue.close();
-                onError();
+                handleError();
                 break;
             } else
                 m_writeBuffer.pop_front();
@@ -145,7 +147,7 @@ void Myasquo::doPing()
     if (mysql_ping(m_conn) != 0) {
         onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
         m_connected = false;
-        onError();
+        handleError();
     }
 }
 
@@ -160,7 +162,7 @@ void Myasquo::executeQuery()
             onLogMessage(m_dbQueue.lastError());
             m_dbQueue.close();
             m_writeInProgress = false;
-            onError();
+            handleError();
             return;
         }
     } else if (!m_writeBuffer.empty()) {
@@ -180,7 +182,7 @@ void Myasquo::executeQuery()
             }
         }
         onLogMessage("MySQL Query failed: "+std::string(mysql_error(m_conn)));
-        onError();
+        handleError();
         return;
     }
 
@@ -193,7 +195,7 @@ void Myasquo::executeQuery()
             onLogMessage(m_dbQueue.lastError());
             m_dbQueue.close();
             m_writeInProgress = false;
-            onError();
+            handleError();
             return;
         } else if (m_dbQueue.empty() && m_writeBuffer.empty()) {
             m_writeInProgress = false;
