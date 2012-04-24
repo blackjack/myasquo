@@ -19,15 +19,28 @@ public:
     void query(const std::string &query);
     void ping();
     virtual void onConnect() {}
-    virtual void onLogMessage(const std::string& message) {}
+    virtual void onLogMessage(const std::string& message, int logLevel) {}
     virtual void onError() {}
+public:
+    static const int LOG_LEVEL_EMERG = 0;
+    static const int LOG_LEVEL_ALERT = 1;
+    static const int LOG_LEVEL_CRIT = 2;
+    static const int LOG_LEVEL_ERR = 3;
+    static const int LOG_LEVEL_WARNING = 4;
+    static const int LOG_LEVEL_NOTICE = 5;
+    static const int LOG_LEVEL_INFO = 6;
+    static const int LOG_LEVEL_DEBUG = 7;
+
+
 protected:
     boost::asio::io_service& ioService() { return m_ioService; }
     void doConnect();
     void doOpenQueue();
     void doQuery(const std::string &msg);
+    bool doPushToDBQueue(const std::string &msg);
+    void doProcessDBQueue();
     void doPing();
-    void executeQuery();
+    int executeQuery(const std::string &msg);
     void handleError();
 private:
     std::string m_hostname;
@@ -37,7 +50,6 @@ private:
     std::string m_database;
     std::string m_dbQueuePath;
     bool m_connected;
-    bool m_writeInProgress;
 
     MYSQL* m_conn;
     boost::thread m_thread;
@@ -45,12 +57,7 @@ private:
     boost::asio::io_service::work m_work;
     boost::asio::deadline_timer m_reconnectTimer;
     boost::asio::deadline_timer m_reopenTimer;
-    bool m_reconnectTimerActive;
-    bool m_reopenTimerActive;
-    bool m_startReopenTimer;
-    bool m_startReconnectTimer;
 
-    std::deque<std::string> m_writeBuffer;
     DBQueue m_dbQueue;
 };
 

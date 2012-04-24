@@ -16,7 +16,7 @@ std::string path_to_filename(const std::string& path) {
 }
 
 std::string itoa(int i) {
-    char buf[50];
+    char buf[20];
     sprintf(buf,"%d",i);
     return std::string(buf);
 }

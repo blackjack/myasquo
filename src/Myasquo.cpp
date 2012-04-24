@@ -1,6 +1,23 @@
 #include "Myasquo.h"
 #include <string>
 #include <mysql/mysql.h>
+#include <mysql/errmsg.h>
+
+namespace {
+std::string path_to_filename(const std::string& path) {
+    std::string result = path;
+    result.erase(0,path.rfind("/")+1);
+    return result;
+}
+
+std::string itoa(int i) {
+    char buf[20];
+    sprintf(buf,"%d",i);
+    return std::string(buf);
+}
+}
+
+#define LOGPREFIX ::path_to_filename(__FILE__)+":"+itoa(__LINE__)+" "
 
 Myasquo::Myasquo(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath):
     m_hostname(hostname),
@@ -10,22 +27,13 @@ Myasquo::Myasquo(const std::string& hostname, int port, const std::string& usern
     m_database(database),
     m_dbQueuePath(queuePath),
     m_connected(false),
-    m_writeInProgress(false),
     m_work(m_ioService),
     m_reconnectTimer(m_ioService),
-    m_reopenTimer(m_ioService),
-    m_reconnectTimerActive(false),
-    m_reopenTimerActive(false),
-    m_startReopenTimer(false),
-    m_startReconnectTimer(false)
+    m_reopenTimer(m_ioService)
 {
-    m_conn = mysql_init(NULL);
-    if (!m_conn) throw std::runtime_error("Not enough memory to allocate MySQL");
-    m_conn->free_me = 1;
-    m_conn->reconnect = 0;
-
-    if (!m_dbQueue.open(queuePath))
+    if (!m_dbQueue.open(queuePath)) {
         throw std::runtime_error(m_dbQueue.lastError());
+    }
 
     m_ioService.post(boost::bind(&Myasquo::doConnect,this));
     m_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_ioService));
@@ -42,36 +50,18 @@ Myasquo::~Myasquo()
 
 void Myasquo::handleError()
 {
+    onError();
     if (!m_dbQueue.is_open()) {
-        if (!m_reopenTimerActive) {
-            if (!m_startReopenTimer) {
-                m_startReopenTimer = true;
-                onError();
-                doOpenQueue();
-            } else {
-                m_reopenTimerActive = true;
-                m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
-                m_reopenTimer.async_wait(boost::bind(&Myasquo::doOpenQueue, this));
-            }
-        }
-    } else if (!m_connected) {
-        while (!m_writeBuffer.empty()) {
-            if (!m_dbQueue.push(m_writeBuffer.front())) {
-                m_dbQueue.close();
-                m_reopenTimer.async_wait(boost::bind(&Myasquo::handleError, this));
-                break;
-            } else
-                m_writeBuffer.pop_front();
+        boost::posix_time::time_duration dur = m_reopenTimer.expires_from_now();
+        if (dur.total_nanoseconds() <= 0) {
+            m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
+            m_reopenTimer.async_wait(boost::bind(&Myasquo::doOpenQueue, this));
         }
     }
 
-    if (!m_connected && !m_reconnectTimerActive) {
-        if (!m_startReconnectTimer) {
-            m_startReconnectTimer = true;
-            onError();
-            doConnect();
-        } else {
-            m_reconnectTimerActive = true;
+    if (!m_connected) {
+        boost::posix_time::time_duration dur = m_reconnectTimer.expires_from_now();
+        if (dur.total_nanoseconds() <= 0) {
             m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
             m_reconnectTimer.async_wait(boost::bind(&Myasquo::doConnect, this));
         }
@@ -91,123 +81,126 @@ void Myasquo::ping()
 
 void Myasquo::doConnect()
 {
-    m_reconnectTimerActive = false;
+    m_conn = mysql_init(NULL);
+    if (!m_conn) throw std::runtime_error("Not enough memory to allocate MySQL");
+    m_conn->free_me = 1;
+    m_conn->reconnect = 0;
+
     if (!mysql_real_connect(m_conn, m_hostname.c_str(), m_username.c_str(), m_password.c_str(), m_database.c_str(), m_port, NULL, CLIENT_INTERACTIVE)) {
-        onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
+        onLogMessage(LOGPREFIX+"Connection to MySQL failed: "+std::string(mysql_error(m_conn)),LOG_LEVEL_WARNING);
         m_connected = false;
         handleError();
         return;
     }
+
+    onLogMessage(LOGPREFIX+"Successfully connected to MySQL",LOG_LEVEL_INFO);
     m_connected = true;
 
-    m_startReconnectTimer = false;
-    if (!m_dbQueue.empty() || !m_writeBuffer.empty())
-        executeQuery();
+    if (!m_dbQueue.empty())
+        doProcessDBQueue();
 
     onConnect();
 }
 
 void Myasquo::doOpenQueue() {
-    m_reopenTimerActive = false;
     if (!m_dbQueue.open(m_dbQueuePath)) {
-        onLogMessage(m_dbQueue.lastError());
+        onLogMessage(LOGPREFIX+m_dbQueue.lastError(),LOG_LEVEL_WARNING);
         handleError();
     } else {
-        m_startReopenTimer = false;
-        while (!m_writeBuffer.empty()) {
-            if (!m_dbQueue.push(m_writeBuffer.front())) {
-                onLogMessage(m_dbQueue.lastError());
-                m_dbQueue.close();
-                handleError();
-                break;
-            } else
-                m_writeBuffer.pop_front();
-        }
-        if (m_connected && !m_writeInProgress)
-            executeQuery();
+        onLogMessage(LOGPREFIX+"DBQueue opened: path: "+m_dbQueuePath+" empty:"+ (m_dbQueue.empty()?"yes":"no"),LOG_LEVEL_INFO);
+        if (m_connected && !m_dbQueue.empty())
+            doProcessDBQueue();
     }
 }
 
 void Myasquo::doQuery(const std::string& msg)
 {
-    if (m_connected)
-        m_writeBuffer.push_back(msg);
-    else
-        if (!m_dbQueue.push(msg)) {
-            onLogMessage(m_dbQueue.lastError());
-            m_dbQueue.close();
+    if (m_connected) {
+        int err = executeQuery(msg);
+        if (err && err>=CR_MIN_ERROR) {
+
+            if (!doPushToDBQueue(msg))
+                m_dbQueue.close();
+
+            mysql_close(m_conn);
+            m_connected = false;
+            handleError();
         }
-    if (m_connected && !m_writeInProgress) {
-        executeQuery();
+
+    }
+    else if (!doPushToDBQueue(msg)) {
+        m_dbQueue.close();
+        handleError();
+    }
+}
+
+bool Myasquo::doPushToDBQueue(const std::string& msg)
+{
+    if (m_dbQueue.is_open()) {
+        if (!m_dbQueue.push(msg)) {
+            onLogMessage(LOGPREFIX+m_dbQueue.lastError(),LOG_LEVEL_WARNING);
+            return false;
+        } else
+            onLogMessage(LOGPREFIX+"Value pushed to DBQueue: "+msg,LOG_LEVEL_DEBUG);
+    } else
+        onLogMessage(LOGPREFIX+"DBQueue is not opened. Discarding query: "+msg,LOG_LEVEL_WARNING);
+    return true;
+}
+
+void Myasquo::doProcessDBQueue()
+{
+    if (!m_connected || m_dbQueue.empty()) return;
+
+    while (!m_dbQueue.empty()) {
+
+        std::string msg = m_dbQueue.front();
+        if (msg.empty()) {
+            onLogMessage(LOGPREFIX+m_dbQueue.lastError(),LOG_LEVEL_WARNING);
+            m_dbQueue.close();
+            handleError();
+            return;
+        } else {
+            onLogMessage(LOGPREFIX+"Value taken from DBQueue: "+msg,LOG_LEVEL_DEBUG);
+        }
+
+        int err = executeQuery(msg);
+        if (err && err>=CR_MIN_ERROR) {
+            mysql_close(m_conn);
+            m_connected = false;
+            handleError();
+            return;
+        }
+
+        if (!m_dbQueue.pop()) {
+            onLogMessage(LOGPREFIX+m_dbQueue.lastError(),LOG_LEVEL_WARNING);
+            m_dbQueue.close();
+            handleError();
+            return;
+        } else
+            onLogMessage(LOGPREFIX+"Value poped from DBQueue (empty: "+(m_dbQueue.empty()?"yes)":"no)"),LOG_LEVEL_DEBUG);
     }
 }
 
 void Myasquo::doPing()
 {
     if (mysql_ping(m_conn) != 0) {
-        onLogMessage("Connection to MySQL failed: "+std::string(mysql_error(m_conn)));
+        onLogMessage(LOGPREFIX+"Connection to MySQL failed: "+std::string(mysql_error(m_conn)),LOG_LEVEL_WARNING);
         m_connected = false;
         handleError();
     }
 }
 
-void Myasquo::executeQuery()
+int Myasquo::executeQuery(const std::string& msg)
 {
-    m_writeInProgress = true;
-
-    std::string msg;
-    if (!m_dbQueue.empty()) {
-        msg = m_dbQueue.front();
-        if (msg.empty()) {
-            onLogMessage(m_dbQueue.lastError());
-            m_dbQueue.close();
-            m_writeInProgress = false;
-            handleError();
-            return;
-        }
-    } else if (!m_writeBuffer.empty()) {
-        msg = m_writeBuffer.front();
-    } else {
-        m_writeInProgress = false;
-        return;
-    }
+    onLogMessage(LOGPREFIX+"Executing query: "+msg,LOG_LEVEL_DEBUG);
 
     if (mysql_query(m_conn,msg.c_str()) != 0) {
-        m_connected = false;
-        m_writeInProgress = false;
-        if (m_dbQueue.empty()) {//query taken from m_writeBuffer
-            if (!m_dbQueue.push(msg)) {
-                onLogMessage(m_dbQueue.lastError());
-                m_dbQueue.close();
-            }
-        }
-        onLogMessage("MySQL Query failed: "+std::string(mysql_error(m_conn)));
-        handleError();
-        return;
+        onLogMessage(LOGPREFIX+"MySQL Query failed: "+std::string(mysql_error(m_conn)),LOG_LEVEL_WARNING);
+        return  mysql_errno(m_conn);
     }
 
     MYSQL_RES* result = mysql_store_result(m_conn);
     if (result)
         mysql_free_result(result);
-
-    if (!m_dbQueue.empty()) {
-        if (!m_dbQueue.pop()) {
-            onLogMessage(m_dbQueue.lastError());
-            m_dbQueue.close();
-            m_writeInProgress = false;
-            handleError();
-            return;
-        } else if (m_dbQueue.empty() && m_writeBuffer.empty()) {
-            m_writeInProgress = false;
-            return;
-        }
-    }
-    else {
-        m_writeBuffer.pop_front();
-        if (m_writeBuffer.empty()) {
-            m_writeInProgress = false;
-            return;
-        }
-    }
-    m_ioService.post(boost::bind(&Myasquo::executeQuery, this));
+    return 0;
 }
