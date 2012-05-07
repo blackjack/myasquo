@@ -34,8 +34,8 @@ public:
 
 protected:
     boost::asio::io_service& ioService() { return m_ioService; }
-    void doConnect();
-    void doOpenQueue();
+    void doConnect(const boost::system::error_code &e);
+    void doOpenQueue(const boost::system::error_code &e);
     void doQuery(const std::string &msg);
     bool doPushToDBQueue(const std::string &msg);
     void doProcessDBQueue();

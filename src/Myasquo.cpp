@@ -2,6 +2,7 @@
 #include <string>
 #include <mysql/mysql.h>
 #include <mysql/errmsg.h>
+#include <boost/asio/placeholders.hpp>
 
 namespace {
 std::string path_to_filename(const std::string& path) {
@@ -35,7 +36,7 @@ Myasquo::Myasquo(const std::string& hostname, int port, const std::string& usern
         throw std::runtime_error(m_dbQueue.lastError());
     }
 
-    m_ioService.post(boost::bind(&Myasquo::doConnect,this));
+    m_ioService.post(boost::bind(&Myasquo::doConnect,this,boost::system::error_code()));
     m_thread = boost::thread(boost::bind(&boost::asio::io_service::run, &m_ioService));
 }
 
@@ -55,7 +56,7 @@ void Myasquo::handleError()
         boost::posix_time::time_duration dur = m_reopenTimer.expires_from_now();
         if (dur.total_nanoseconds() <= 0) {
             m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
-            m_reopenTimer.async_wait(boost::bind(&Myasquo::doOpenQueue, this));
+            m_reopenTimer.async_wait(boost::bind(&Myasquo::doOpenQueue, this, boost::asio::placeholders::error));
         }
     }
 
@@ -63,7 +64,7 @@ void Myasquo::handleError()
         boost::posix_time::time_duration dur = m_reconnectTimer.expires_from_now();
         if (dur.total_nanoseconds() <= 0) {
             m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
-            m_reconnectTimer.async_wait(boost::bind(&Myasquo::doConnect, this));
+            m_reconnectTimer.async_wait(boost::bind(&Myasquo::doConnect, this, boost::asio::placeholders::error));
         }
     }
 }
@@ -79,8 +80,11 @@ void Myasquo::ping()
 }
 
 
-void Myasquo::doConnect()
+void Myasquo::doConnect(const boost::system::error_code& e)
 {
+    if (e == boost::asio::error::operation_aborted)
+        return;
+
     m_conn = mysql_init(NULL);
     if (!m_conn) throw std::runtime_error("Not enough memory to allocate MySQL");
     m_conn->free_me = 1;
@@ -102,7 +106,10 @@ void Myasquo::doConnect()
     onConnect();
 }
 
-void Myasquo::doOpenQueue() {
+void Myasquo::doOpenQueue(const boost::system::error_code& e) {
+    if (e == boost::asio::error::operation_aborted)
+        return;
+
     if (!m_dbQueue.open(m_dbQueuePath)) {
         onLogMessage(LOGPREFIX+m_dbQueue.lastError(),LOG_LEVEL_WARNING);
         handleError();
