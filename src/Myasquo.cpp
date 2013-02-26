@@ -28,7 +28,7 @@ Myasquo::Myasquo(const std::string& hostname, int port, const std::string& usern
     m_database(database),
     m_dbQueuePath(queuePath),
     m_connected(false),
-    m_work(m_ioService),
+    m_work(m_ioService), //to run io_service thread even if no real jobs present
     m_reconnectTimer(m_ioService),
     m_reopenTimer(m_ioService)
 {
@@ -71,6 +71,7 @@ void Myasquo::handleError()
 
 void Myasquo::query(const std::string &query)
 {
+    onLogMessage(LOGPREFIX+"Posting query to the io_service",LOG_LEVEL_DEBUG);
     m_ioService.post(boost::bind(&Myasquo::doQuery, this, query));
 }
 
@@ -124,15 +125,19 @@ void Myasquo::doQuery(const std::string& msg)
 {
     if (m_connected) {
         int err = executeQuery(msg);
-        if (err && err>=CR_MIN_ERROR) {
+        if (err) {
+            onLogMessage(LOGPREFIX+"Query execution failed: "+ mysql_error(m_conn) +" Query: "+msg,LOG_LEVEL_WARNING);
+            if (err>=CR_MIN_ERROR) {
+                onLogMessage(LOGPREFIX+"Critical error, reconnecting",LOG_LEVEL_ALERT);
+                if (!doPushToDBQueue(msg))
+                    m_dbQueue.close();
 
-            if (!doPushToDBQueue(msg))
-                m_dbQueue.close();
-
-            mysql_close(m_conn);
-            m_connected = false;
-            handleError();
-        }
+                mysql_close(m_conn);
+                m_connected = false;
+                handleError();
+            }
+        } else
+            onLogMessage(LOGPREFIX+"Query execution succeeded. Query: "+msg,LOG_LEVEL_DEBUG);
 
     }
     else if (!doPushToDBQueue(msg)) {
@@ -190,6 +195,7 @@ void Myasquo::doProcessDBQueue()
 
 void Myasquo::doPing()
 {
+    onLogMessage(LOGPREFIX+"Pinging mysql",LOG_LEVEL_DEBUG);
     if (mysql_ping(m_conn) != 0) {
         onLogMessage(LOGPREFIX+"Connection to MySQL failed: "+std::string(mysql_error(m_conn)),LOG_LEVEL_WARNING);
         m_connected = false;
@@ -206,8 +212,7 @@ int Myasquo::executeQuery(const std::string& msg)
         return  mysql_errno(m_conn);
     }
 
-    MYSQL_RES* result = mysql_store_result(m_conn);
-    if (result)
-        mysql_free_result(result);
+    onQueryResult(MySQLResult(m_conn,msg));
+
     return 0;
 }

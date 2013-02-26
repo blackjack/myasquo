@@ -6,7 +6,9 @@
 #include <boost/asio/io_service.hpp>
 #include <boost/asio/deadline_timer.hpp>
 #include <boost/thread.hpp>
+
 #include "DBQueue.h"
+#include "MySQLResult.h"
 
 typedef struct st_mysql MYSQL;
 
@@ -19,6 +21,7 @@ public:
     void query(const std::string &query);
     void ping();
     virtual void onConnect() {}
+    virtual void onQueryResult(MySQLResult result) {}
     virtual void onLogMessage(const std::string& message, int logLevel) {}
     virtual void onError() {}
 public:

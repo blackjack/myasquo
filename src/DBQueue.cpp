@@ -1,5 +1,6 @@
 #include "DBQueue.h"
 #include "string.h"
+#include "boost/filesystem.hpp"
 
 DBQueue::DBQueue():
     m_seek(0),m_isOpen(false)
@@ -26,6 +27,10 @@ std::string itoa(int i) {
 
 bool DBQueue::open(const std::string& path)
 {
+    try {
+        boost::filesystem::create_directories(path);
+    } catch (...) {}
+
     if (path.at(path.size()-1)=='/') {
         m_queuePath = path; m_queuePath+="queue";
         m_indexPath = path; m_indexPath+="index";
@@ -109,7 +114,12 @@ bool DBQueue::pop()
     }
 
     std::string s;
-    TRY(std::getline(m_queueFile,s),"Error getting line from queue","");
+    try {
+        std::getline(m_queueFile,s);
+    } catch (const std::fstream::failure& e) {
+        setLastError(::path_to_filename(__FILE__)+":"+itoa(__LINE__)+" "+"Error getting line from queue","");
+        return false;
+    }
 
     TRY(setSeek(m_queueFile.tellg()),"Error setting seek position","");
 
@@ -127,25 +137,33 @@ bool DBQueue::pop()
     return true;
 }
 
-#define TRY_S(operation,result,filename) try { operation; } catch (const std::fstream::failure& e) { setLastError(::path_to_filename(__FILE__)+":"+itoa(__LINE__)+" "+result,filename); return std::string(); }
+#undef TRY
+#define TRY(operation,result,filename) try { operation; } catch (const std::fstream::failure& e) { setLastError(::path_to_filename(__FILE__)+":"+itoa(__LINE__)+" "+result,filename); return std::string(); }
 std::string DBQueue::front()
 {
     if (m_lastOpenMode & std::ios_base::out) {
-        TRY_S(reopenQueue(std::ios_base::in),"Error reopening queue file","");
+        TRY(reopenQueue(std::ios_base::in),"Error reopening queue file","");
 
         if (m_seek >0) {
-            TRY_S(m_queueFile.seekg(m_seek),"Error seeking queue to the "+::itoa(m_seek),"");
+            TRY(m_queueFile.seekg(m_seek),"Error seeking queue to the "+::itoa(m_seek),"");
         }
         else {
-            TRY_S(m_queueFile.seekg(0,std::ios_base::beg),"Error seeking queue to the beginning","");
+            TRY(m_queueFile.seekg(0,std::ios_base::beg),"Error seeking queue to the beginning","");
         }
     }
 
 
     int t = m_queueFile.tellg();
     std::string result;
-    TRY_S(std::getline(m_queueFile,result),"Error getting line from queue","");
-    TRY_S(m_queueFile.seekg(t),"Error seeking queue to the "+::itoa(t),"");
+
+    try {
+        std::getline(m_queueFile,result);
+    } catch (const std::fstream::failure& e) {
+        setLastError(::path_to_filename(__FILE__)+":"+itoa(__LINE__)+" "+"Error getting line from queue","");
+        return std::string();
+    }
+
+    TRY(m_queueFile.seekg(t),"Error seeking queue to the "+::itoa(t),"");
 
     return result;
 }
