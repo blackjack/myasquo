@@ -13,7 +13,21 @@ typedef struct st_mysql MYSQL;
 class Myasquo
 {
 public:
-    Myasquo(const std::string& hostname, int port, const std::string& username, const std::string& password, const std::string& database, const std::string queuePath);
+    Myasquo(const std::string& hostname,
+            int port,
+            const std::string& username,
+            const std::string& password,
+            const std::string& database,
+            const std::string queuePath);
+
+    Myasquo(const std::string& hostname,
+            int port,
+            const std::string& username,
+            const std::string& password,
+            const std::string& database,
+            const std::string queuePath,
+            boost::asio::io_service& io_service
+            );
     ~Myasquo();
 
     void query(const std::string &query);
@@ -33,7 +47,7 @@ public:
 
 
 protected:
-    boost::asio::io_service& ioService() { return m_ioService; }
+    boost::asio::io_service& ioService() { return *m_ioService; }
     void doConnect(const boost::system::error_code &e);
     void doOpenQueue(const boost::system::error_code &e);
     void doQuery(const std::string &msg);
@@ -53,7 +67,8 @@ private:
 
     MYSQL* m_conn;
     boost::thread m_thread;
-    boost::asio::io_service m_ioService;
+    bool m_ownIoService;
+    boost::asio::io_service *m_ioService;
     boost::asio::io_service::work m_work;
     boost::asio::deadline_timer m_reconnectTimer;
     boost::asio::deadline_timer m_reopenTimer;
