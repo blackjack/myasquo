@@ -24,7 +24,7 @@ IF(MYASQUO_VERBOSE_DEBUG_OUTPUT)
   ADD_DEFINITIONS("-DMYASQUO_VERBOSE_DEBUG_OUTPUT")
 endif(MYASQUO_VERBOSE_DEBUG_OUTPUT)
 
-find_package(Boost COMPONENTS thread system REQUIRED)
+find_package(Boost COMPONENTS thread system filesystem REQUIRED)
 find_package(MySQL REQUIRED)
 
 #add extra search paths for libraries and includes
