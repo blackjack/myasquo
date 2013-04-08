@@ -12,16 +12,12 @@ public:
         std::cout << message << std::endl;
     }
 
-    void onQueryResult(MySQLResult result) {
-        std::cout << "Result got: " << std::endl;
-        for (unsigned i = 0; i<result.size(); ++i) {
-            MySQLResult::row row = result.getRow(i);
-            for (unsigned l = 0; l<row.length; ++l ) {
-                MySQLResult::column column = row[l];
-                std::cout << std::string(column.data,column.length) << " ";
-            }
-            std::cout << std::endl;
+    bool onQueryResultRow(char **row, unsigned int fieldsNum, unsigned long *lengths) {
+        for (unsigned i = 0; i<fieldsNum; ++i) {
+            std::cout << row[i] << " ";
         }
+        std::cout << std::endl;
+        return true;
     }
 };
 

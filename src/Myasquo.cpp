@@ -266,7 +266,19 @@ int Myasquo::executeQuery(const std::string& msg)
         return  mysql_errno(m_conn);
     }
 
-    onQueryResult(MySQLResult(m_conn,msg));
+
+    MYSQL_RES *result = mysql_use_result(m_conn);
+    if (!result) return mysql_errno(m_conn);
+    int numFields = mysql_num_fields(result);
+    MYSQL_ROW row;
+    while (row = mysql_fetch_row(result)) {
+         if (!onQueryResultRow(row,numFields,mysql_fetch_lengths(result))) {
+           while (mysql_fetch_row(result)) {} //read the rest and return
+           break;
+         }
+    }
+    onQueryResultRow(NULL,0,NULL);
+    mysql_free_result(result);
 
     return 0;
 }

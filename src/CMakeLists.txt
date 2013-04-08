@@ -1,13 +1,12 @@
 install(FILES
         Myasquo.h
         DBQueue.h
-        MySQLResult.h
         DESTINATION ${INCLUDE_INSTALL_DIR}/myasquo COMPONENT Devel
 )
 
 
 
-set (myasquo_SRCS Myasquo.cpp DBQueue.cpp MySQLResult.cpp)
+set (myasquo_SRCS Myasquo.cpp DBQueue.cpp)
 
 add_library (myasquo STATIC ${myasquo_SRCS})
 target_link_libraries(myasquo ${Boost_LIBRARIES})
