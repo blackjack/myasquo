@@ -1,0 +1,50 @@
+Source: myasquo
+Section: libs
+Priority: extra
+Maintainer: Andriy Senkovych <jolly_roger@itblog.org.ua>
+Build-Depends: debhelper (>=7.0.50~),
+               cmake,
+               libboost-all-dev,
+               libmysqlclient-dev
+Standards-Version: 3.9.4.0
+Homepage: https://github.com/blackjack/myasquo
+Vcs-Git: git://github.com/blackjack/myasquo.git
+Vcs-Browser: https://github.com/blackjack/myasquo
+
+Package: libmyasquo-dev
+Section: libdevel
+Architecture: any
+Depends: libmyasquo0 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL asyncronous queued library
+ It's main purpose is to provide async capabilities, reliability and simplicity.
+ All the data that cannot be written will be backed up in the filesystem.
+ .
+ This library is designed only for setting data, but not getting it - you cannot 
+ get return value of the query.
+ .
+ This package includes development headers required to build your application 
+ against libmyasquo.
+
+Package: libmyasquo0
+Section: libs
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: MySQL asyncronous queued library
+ It's main purpose is to provide async capabilities, reliability and simplicity.
+ All the data that cannot be written will be backed up in the filesystem.
+ .
+ This library is designed only for setting data, but not getting it - you cannot 
+ get return value of the query. 
+
+Package: libmyasquo0-dbg
+Architecture: any
+Section: debug
+Depends: libmyasquo0 (= ${binary:Version}), ${misc:Depends}
+Description: MySQL asyncronous queued library
+ It's main purpose is to provide async capabilities, reliability and simplicity.
+ All the data that cannot be written will be backed up in the filesystem.
+ .
+ This library is designed only for setting data, but not getting it - you cannot 
+ get return value of the query. 
+ .
+ This package includes debugging symbols for libmyasquo.
