@@ -26,7 +26,7 @@ INSTALL(TARGETS myasquo
 
 
 add_executable(example examples/example.cpp)
-target_link_libraries(example myasquo)
+target_link_libraries(example myasquo ${MYSQL_LIBRARIES} )
 
 install(FILES
         examples/example.cpp
