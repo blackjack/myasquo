@@ -83,13 +83,14 @@ Myasquo::~Myasquo()
     m_reopenTimer.cancel();
     m_reconnectTimer.cancel();
     m_dbQueue.close();
-    if (m_ownIoService)
+    if (m_ownIoService) {
         delete m_ioService;
-    m_thread.join();
+        m_thread.join();
+    }
     if (m_conn) {
-        onLogMessage(LOGPREFIX+"Closing MySQL connection",LOG_LEVEL_INFO);
         mysql_close(m_conn);
     }
+    onLogMessage(LOGPREFIX+"Closing MySQL connection",LOG_LEVEL_INFO);
 }
 
 void Myasquo::handleError()
