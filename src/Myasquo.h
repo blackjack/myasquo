@@ -29,7 +29,7 @@ public:
             const std::string queuePath,
             boost::asio::io_service& io_service
             );
-    ~Myasquo();
+    virtual ~Myasquo();
 
     void query(const std::string &query);
     void ping();
