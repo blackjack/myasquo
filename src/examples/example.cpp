@@ -29,7 +29,6 @@ int main() {
     std::cin >> user >> password;
     MyClient client("localhost", 3306, user, password, "timeseries", "/tmp");
 
-
     while (true) {
         client.query("SELECT * FROM `1min` LIMIT 0 , 30");
         sleep(1);

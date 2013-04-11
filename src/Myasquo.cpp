@@ -33,6 +33,7 @@ Myasquo::Myasquo(const std::string& hostname,
     m_database(database),
     m_dbQueuePath(queuePath),
     m_connected(false),
+    m_conn(NULL),
     m_ownIoService(true),
     m_ioService(new boost::asio::io_service()),
     m_work(*m_ioService),
@@ -85,6 +86,8 @@ Myasquo::~Myasquo()
     if (m_ownIoService)
         delete m_ioService;
     m_thread.join();
+    if (m_conn)
+        mysql_close(m_conn);
 }
 
 void Myasquo::handleError()
