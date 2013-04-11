@@ -86,8 +86,10 @@ Myasquo::~Myasquo()
     if (m_ownIoService)
         delete m_ioService;
     m_thread.join();
-    if (m_conn)
+    if (m_conn) {
+        onLogMessage(LOGPREFIX+"Closing MySQL connection",LOG_LEVEL_INFO);
         mysql_close(m_conn);
+    }
 }
 
 void Myasquo::handleError()
