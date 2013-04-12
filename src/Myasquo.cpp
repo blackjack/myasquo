@@ -89,16 +89,16 @@ Myasquo::~Myasquo()
     }
     if (m_conn) {
         mysql_close(m_conn);
+        onLogMessage(LOGPREFIX+"Closing MySQL connection",LOG_LEVEL_INFO);
     }
-    onLogMessage(LOGPREFIX+"Closing MySQL connection",LOG_LEVEL_INFO);
 }
 
 void Myasquo::handleError()
 {
     onError();
     if (!m_dbQueue.is_open()) {
-        boost::posix_time::time_duration dur = m_reopenTimer.expires_from_now();
-        if (dur.total_nanoseconds() <= 0) {
+        boost::posix_time::time_duration dur = m_reopenTimer.expires_from_now().invert_sign();
+        if (!dur.is_negative()) {
             m_reopenTimer.expires_from_now(boost::posix_time::seconds(1));
             m_reopenTimer.async_wait(
                         boost::bind(&Myasquo::doOpenQueue, this, boost::asio::placeholders::error)
@@ -107,8 +107,9 @@ void Myasquo::handleError()
     }
 
     if (!m_connected) {
-        boost::posix_time::time_duration dur = m_reconnectTimer.expires_from_now();
-        if (dur.total_nanoseconds() <= 0) {
+        boost::posix_time::time_duration dur = m_reconnectTimer.expires_from_now().invert_sign();
+        if (!dur.is_negative()) {
+            onLogMessage(LOGPREFIX+"Trying to reconnect in 1 second",LOG_LEVEL_DEBUG);
             m_reconnectTimer.expires_from_now(boost::posix_time::seconds(1));
             m_reconnectTimer.async_wait(
                         boost::bind(&Myasquo::doConnect, this, boost::asio::placeholders::error)
