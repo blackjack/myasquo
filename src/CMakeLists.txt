@@ -10,7 +10,7 @@ set (myasquo_SRCS Myasquo.cpp DBQueue.cpp)
 
 include_directories(${PROJECT_INCLUDES})
 
-add_library (myasquo SHARED ${myasquo_SRCS})
+add_library (myasquo STATIC ${myasquo_SRCS})
 
 target_link_libraries(myasquo ${PROJECT_LIBRARIES})
 
