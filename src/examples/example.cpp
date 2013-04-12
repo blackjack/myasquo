@@ -1,6 +1,5 @@
 #include "../Myasquo.h"
 #include <iostream>
-#include <mysql/mysql.h>
 
 class MyClient: public Myasquo
 {
