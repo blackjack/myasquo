@@ -1,7 +1,7 @@
 #include "Myasquo.h"
 #include <string>
-#include <mysql/mysql.h>
-#include <mysql/errmsg.h>
+#include <mysql.h>
+#include <errmsg.h>
 #include <boost/asio/placeholders.hpp>
 
 namespace {

@@ -27,6 +27,18 @@ endif(MYASQUO_VERBOSE_DEBUG_OUTPUT)
 find_package(Boost COMPONENTS thread system filesystem REQUIRED)
 find_package(MySQL REQUIRED)
 
+SET (PROJECT_INCLUDES
+${Boost_INCLUDE_DIR}
+${MYSQL_INCLUDE_DIR}
+)
+
+SET(
+PROJECT_LIBRARIES
+${Boost_LIBRARIES}
+${MYSQL_LIBRARIES}
+)
+
+
 #add extra search paths for libraries and includes
 SET (LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)" )
 SET (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Directory where lib will install")

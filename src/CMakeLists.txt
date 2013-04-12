@@ -8,9 +8,11 @@ install(FILES
 
 set (myasquo_SRCS Myasquo.cpp DBQueue.cpp)
 
-add_library (myasquo STATIC ${myasquo_SRCS})
-target_link_libraries(myasquo ${Boost_LIBRARIES})
-target_link_libraries(myasquo ${MYSQL_LIBRARIES})
+include_directories(${PROJECT_INCLUDES})
+
+add_library (myasquo SHARED ${myasquo_SRCS})
+
+target_link_libraries(myasquo ${PROJECT_LIBRARIES})
 
 set_target_properties(myasquo PROPERTIES
                       VERSION ${MYASQUO_LIB_MAJOR_VERSION}.${MYASQUO_LIB_MINOR_VERSION}.${MYASQUO_LIB_PATCH_VERSION}
@@ -25,8 +27,10 @@ INSTALL(TARGETS myasquo
 )
 
 
+
+
 add_executable(example examples/example.cpp)
-target_link_libraries(example myasquo ${MYSQL_LIBRARIES} )
+target_link_libraries(example myasquo)
 
 install(FILES
         examples/example.cpp
