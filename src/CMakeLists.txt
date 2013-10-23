@@ -4,7 +4,8 @@ install(FILES
         DESTINATION ${INCLUDE_INSTALL_DIR}/myasquo COMPONENT Devel
 )
 
-
+#add C++11 compile flag to be able to work with programs using it
+add_definitions("-std=c++11")
 
 set (myasquo_SRCS Myasquo.cpp DBQueue.cpp)
 
