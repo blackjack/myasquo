@@ -3,8 +3,8 @@ exec_prefix=${prefix}
 libdir=@LIB_INSTALL_DIR@
 includedir=@INCLUDE_INSTALL_DIR@
 
-Name: myasquo
-Description: myasquo is an asynchronous Mysql library with ability to store not executed queries in FIFO queue
-Version: @MYASQUO_LIB_MAJOR_VERSION@.@MYASQUO_LIB_MINOR_VERSION@.@MYASQUO_LIB_PATCH_VERSION@
-Libs: -L${libdir} -lmyasquo
+Name: @PROJECT_NAME@
+Description: @PROJECT_NAME@ is an asynchronous MySQL library with ability to store not executed queries in FIFO queue
+Version: @MYASQUO_LIB_VERSION_STRING@
+Libs: -L${libdir} -l@PROJECT_NAME@
 Cflags: -I${includedir}

@@ -1,4 +1,4 @@
-#include "../Myasquo.h"
+#include "Myasquo.h"
 #include <iostream>
 
 class MyClient: public Myasquo

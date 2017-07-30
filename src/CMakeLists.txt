@@ -1,39 +1,28 @@
-install(FILES
-        Myasquo.h
-        DBQueue.h
-        DESTINATION ${INCLUDE_INSTALL_DIR}/myasquo COMPONENT Devel
-)
+set(myasquo_SRCS Myasquo.cpp DBQueue.cpp)
 
-#add C++11 compile flag to be able to work with programs using it
-add_definitions("-std=c++11")
+find_package(Boost COMPONENTS thread system filesystem REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 
-set (myasquo_SRCS Myasquo.cpp DBQueue.cpp)
+find_package(MySQL REQUIRED)
+include_directories(${MYSQL_INCLUDE_DIR})
 
-include_directories(${PROJECT_INCLUDES})
+add_library(${PROJECT_NAME} ${MYASQUO_LIBRARY_TYPE} ${myasquo_SRCS})
+target_link_libraries(${PROJECT_NAME} ${Boost_LIBRARIES} ${MYSQL_LIBRARIES})
 
-add_library (myasquo STATIC ${myasquo_SRCS})
+set_target_properties(${PROJECT_NAME} PROPERTIES
+    VERSION "${LIB_VERSION_STRING}"
+    SOVERSION "${LIB_MAJOR_VERSION}"
+    DEFINE_SYMBOL "MYASQUO_MAKEDLL")
 
-target_link_libraries(myasquo ${PROJECT_LIBRARIES})
-
-set_target_properties(myasquo PROPERTIES
-                      VERSION ${MYASQUO_LIB_MAJOR_VERSION}.${MYASQUO_LIB_MINOR_VERSION}.${MYASQUO_LIB_PATCH_VERSION}
-                      SOVERSION ${MYASQUO_LIB_MAJOR_VERSION}
-                      DEFINE_SYMBOL MYASQUO_MAKEDLL
-                      )
-
-INSTALL(TARGETS myasquo
+INSTALL(TARGETS ${PROJECT_NAME}
    LIBRARY DESTINATION ${LIB_INSTALL_DIR}
    RUNTIME DESTINATION bin
-   ARCHIVE DESTINATION  ${LIB_INSTALL_DIR}
-)
-
-
-
-
-add_executable(example examples/example.cpp)
-target_link_libraries(example myasquo ${PROJECT_LIBRARIES})
+   ARCHIVE DESTINATION ${LIB_INSTALL_DIR})
 
 install(FILES
-        examples/example.cpp
-        DESTINATION share/doc/libmyasquo/examples
-)
+    Myasquo.h
+    DBQueue.h
+    DESTINATION ${INCLUDE_INSTALL_DIR}/${PROJECT_NAME}
+    COMPONENT dev)
+
+

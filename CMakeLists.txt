@@ -1,13 +1,16 @@
-PROJECT(myasquo)
-
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules)
 
-# where to look first for cmake modules, before ${CMAKE_ROOT}/Modules/ is checked
-set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/modules")
+PROJECT(myasquo CXX)
 
-set(CMAKE_INSTALL_NAME_DIR ${LIB_INSTALL_DIR})
+set(LIB_MAJOR_VERSION "0")
+set(LIB_MINOR_VERSION "1")
+set(LIB_PATCH_VERSION "0")
 
-# compile in debug mode
+set(LIB_VERSION_STRING "${LIB_MAJOR_VERSION}.${LIB_MINOR_VERSION}.${LIB_PATCH_VERSION}")
+
+
+# compile in release with debug info mode by default
 IF(NOT CMAKE_BUILD_TYPE)
   SET(CMAKE_BUILD_TYPE RelWithDebInfo CACHE STRING
       "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel."
@@ -19,80 +22,88 @@ IF("${CMAKE_BUILD_TYPE}" MATCHES "^Rel.*")
   ADD_DEFINITIONS("-DQT_NO_DEBUG_OUTPUT")
 ENDIF("${CMAKE_BUILD_TYPE}" MATCHES "^Rel.*")
 
+
+OPTION(MYASQUO_BUILD_SHARED "Build myasquo as a shared library" ON)
+OPTION(MYASQUO_VERBOSE_DEBUG_OUTPUT "Enable additional verbose debug output" OFF)
+OPTION(MYASQUO_BUILD_CXX11 "Build myasquo with C++11" ON)
+OPTION(MYASQUO_BUILD_EXAMPLES "Build myasquo examples" ON)
+
+
+# Select to build shared or static library
+IF(MYASQUO_BUILD_SHARED)
+    SET(MYASQUO_LIBRARY_TYPE SHARED)
+else()
+    SET(MYASQUO_LIBRARY_TYPE STATIC)
+ENDIF()
+
+IF(MYASQUO_BUILD_CXX11)
+    ADD_DEFINITIONS("-std=c++11")
+ENDIF()
+
+
 # Ability to disable verbose debug output
 IF(MYASQUO_VERBOSE_DEBUG_OUTPUT)
   ADD_DEFINITIONS("-DMYASQUO_VERBOSE_DEBUG_OUTPUT")
 endif(MYASQUO_VERBOSE_DEBUG_OUTPUT)
 
-find_package(Boost COMPONENTS thread system filesystem REQUIRED)
-find_package(MySQL REQUIRED)
 
-SET (PROJECT_INCLUDES
-${Boost_INCLUDE_DIR}
-${MYSQL_INCLUDE_DIR}
-)
+# Path definitions
+SET(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)" )
+SET(LIB_INSTALL_DIR     "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Directory where lib will install")
+SET(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "The directory the headers are installed in")
+SET(DOC_INSTALL_DIR     "${CMAKE_INSTALL_PREFIX}/share/doc/${PROJECT_NAME}" CACHE PATH "Path to the documentation")
+SET(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib${LIB_SUFFIX}")
 
-SET(
-PROJECT_LIBRARIES
-${Boost_LIBRARIES}
-${MYSQL_LIBRARIES}
-)
+SET(CMAKE_MODULES_INSTALL_DIR "${CMAKE_ROOT}/Modules" CACHE PATH "The directory to install Findmyasquo.cmake to")
 
 
-#add extra search paths for libraries and includes
-SET (LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)" )
-SET (LIB_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Directory where lib will install")
-SET (INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "The directory the headers are installed in")
-SET (CMAKE_MODULES_INSTALL_DIR "${CMAKE_ROOT}/Modules" CACHE PATH "The directory to install Findmyasquo.cmake to")
+# Subdirs
+add_subdirectory(src)
+add_subdirectory(example)
 
+EXPORT( PACKAGE ${PROJECT_NAME} )
 
-set(MYASQUO_LIB_MAJOR_VERSION "0")
-set(MYASQUO_LIB_MINOR_VERSION "1")
-set(MYASQUO_LIB_PATCH_VERSION "0")
+# CMake config to provide library detection on target system. New policy
+# requires to expand target name at run-time and not at configure time, thus
+# requiring to run file(GENERATE) after configure_file() in some cases.
 
-set(MYASQUO_LIB_VERSION_STRING "${MYASQUO_LIB_MAJOR_VERSION}.${MYASQUO_LIB_MINOR_VERSION}.${MYASQUO_LIB_PATCH_VERSION}")
+# See https://cmake.org/pipermail/cmake/2015-April/060350.html for more
+# details.
 
-set(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib${LIB_SUFFIX}" )
+SET(CMAKECONFIG_INSTALL_DIR lib/cmake/${PROJECT_NAME})
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}-config.cmake.in
+               ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.pre
+               @ONLY)
+FILE(GENERATE
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
+    INPUT  ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.pre)
+
+CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}-config-version.cmake.in
+               ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+               @ONLY)
+INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
+              ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
+              DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+
 
 # pkg-config
 IF (NOT WIN32)
-  CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/myasquo.pc.in
-                  ${CMAKE_CURRENT_BINARY_DIR}/myasquo.pc
-                  @ONLY)
-  INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/myasquo.pc
-           DESTINATION lib${LIB_SUFFIX}/pkgconfig)
+    CONFIGURE_FILE (${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}.pc.in
+        ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
+        @ONLY)
+    INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
+        DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
 ENDIF (NOT WIN32)
 
-# Subdirs
-ADD_SUBDIRECTORY(src)
+# Obsloete way to look for the library files.
+install(FILES CMakeModules/Find${PROJECT_NAME}.cmake
+    DESTINATION ${CMAKE_MODULES_INSTALL_DIR})
 
-add_subdirectory(cmake/modules)
-
-
+# Custom target to uninstall library and supplementary files
 CONFIGURE_FILE(
-  "${CMAKE_MODULE_PATH}/cmake_uninstall.cmake.in"
-  "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake"
+  ${CMAKE_MODULE_PATH}/cmake_uninstall.cmake.in
+  ${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake
   IMMEDIATE @ONLY)
-
-GET_TARGET_PROPERTY(LIB_OUT_NAME myasquo LOCATION)
-GET_FILENAME_COMPONENT(LIB_OUT_NAME  ${LIB_OUT_NAME} NAME)
-
-# cmake-modules
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/myasquo-config.cmake.in
-               ${CMAKE_CURRENT_BINARY_DIR}/myasquo-config.cmake
-               @ONLY)
-CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/myasquo-config-version.cmake.in
-               ${CMAKE_CURRENT_BINARY_DIR}/myasquo-config-version.cmake
-               @ONLY)
-INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/myasquo-config.cmake
-              ${CMAKE_CURRENT_BINARY_DIR}/myasquo-config-version.cmake
-        DESTINATION "lib/cmake/myasquo")
-
-install(FILES
-        COPYING
-        README
-        DESTINATION share/doc/libmyasquo
-)
 
 ADD_CUSTOM_TARGET(uninstall
   "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake_uninstall.cmake")
