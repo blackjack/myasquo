@@ -95,10 +95,6 @@ IF (NOT WIN32)
         DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
 ENDIF (NOT WIN32)
 
-# Obsloete way to look for the library files.
-install(FILES CMakeModules/Find${PROJECT_NAME}.cmake
-    DESTINATION ${CMAKE_MODULES_INSTALL_DIR})
-
 # Custom target to uninstall library and supplementary files
 CONFIGURE_FILE(
   ${CMAKE_MODULE_PATH}/cmake_uninstall.cmake.in
