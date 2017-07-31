@@ -1,4 +1,4 @@
-Myasquo version 0.1.0
+Myasquo version 0.1.1
 -------------------------------------------------
 Date: February 24, 2012
 Website: https://github.com/blackjack/myasquo
@@ -17,11 +17,11 @@ License
 
 Examples
 -------
-  See directory src/examples for it!
+  See `examples` directory.
 
 Description
 -----------
-  Myasquo is an Mysql asyncronous queued library.
+  Myasquo is an MySQL asyncronous queued library.
   It's main purpose is to provide async capabilities, reliability and simplicity.
   All the data that cannot be written will be backed up in the filesystem.
 
