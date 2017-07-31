@@ -59,7 +59,7 @@ SET(CMAKE_MODULES_INSTALL_DIR "${CMAKE_ROOT}/Modules" CACHE PATH "The directory 
 
 # Subdirs
 add_subdirectory(src)
-add_subdirectory(example)
+add_subdirectory(examples)
 
 EXPORT( PACKAGE ${PROJECT_NAME} )
 
