@@ -3,11 +3,11 @@ Section: libs
 Priority: extra
 Maintainer: Andriy Senkovych <jolly_roger@itblog.org.ua>
 Uploaders: Oleksandr Senkovych <bjsenya@gmail.com>
-Build-Depends: debhelper (>=7.0.50~),
+Build-Depends: debhelper (>= 10),
                cmake,
                libboost-all-dev,
-               libmysqlclient-dev
-Standards-Version: 3.9.4.0
+               default-libmysqlclient-dev
+Standards-Version: 4.0.0
 Homepage: https://github.com/blackjack/myasquo
 Vcs-Git: git://github.com/blackjack/myasquo.git
 Vcs-Browser: https://github.com/blackjack/myasquo
@@ -36,16 +36,3 @@ Description: MySQL asyncronous queued library
  .
  This library is designed only for setting data, but not getting it - you cannot 
  get return value of the query. 
-
-Package: libmyasquo0-dbg
-Architecture: any
-Section: debug
-Depends: libmyasquo0 (= ${binary:Version}), ${misc:Depends}
-Description: MySQL asyncronous queued library
- It's main purpose is to provide async capabilities, reliability and simplicity.
- All the data that cannot be written will be backed up in the filesystem.
- .
- This library is designed only for setting data, but not getting it - you cannot 
- get return value of the query. 
- .
- This package includes debugging symbols for libmyasquo.
