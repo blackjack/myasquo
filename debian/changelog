@@ -1,3 +1,9 @@
+myasquo (0.1.2-1) unstable; urgency=medium
+
+  * New upstream release 0.1.2
+
+ -- Andrii Senkovych <jolly_roger@itblog.org.ua>  Wed, 09 Aug 2017 16:34:49 +0300
+
 myasquo (0.1.1-1) unstable; urgency=medium
 
   * New upstream release 0.1.1
