@@ -16,7 +16,7 @@ Package: libmyasquo-dev
 Section: libdevel
 Architecture: any
 Depends: libmyasquo0 (= ${binary:Version}), ${misc:Depends}
-Description: MySQL asyncronous queued library
+Description: MySQL asynchronous queued library
  It's main purpose is to provide async capabilities, reliability and simplicity.
  All the data that cannot be written will be backed up in the filesystem.
  .
@@ -30,7 +30,7 @@ Package: libmyasquo0
 Section: libs
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: MySQL asyncronous queued library
+Description: MySQL asynchronous queued library
  It's main purpose is to provide async capabilities, reliability and simplicity.
  All the data that cannot be written will be backed up in the filesystem.
  .
