@@ -1,10 +1,10 @@
 prefix=@CMAKE_INSTALL_PREFIX@
 exec_prefix=${prefix}
-libdir=@LIB_INSTALL_DIR@
-includedir=@INCLUDE_INSTALL_DIR@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
 
 Name: @PROJECT_NAME@
 Description: @PROJECT_NAME@ is an asynchronous MySQL library with ability to store not executed queries in FIFO queue
-Version: @MYASQUO_LIB_VERSION_STRING@
+Version: @LIB_VERSION_STRING@
 Libs: -L${libdir} -l@PROJECT_NAME@
 Cflags: -I${includedir}

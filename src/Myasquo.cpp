@@ -1,8 +1,10 @@
-#include "Myasquo.h"
 #include <string>
+#include <boost/asio/placeholders.hpp>
+
 #include <mysql.h>
 #include <errmsg.h>
-#include <boost/asio/placeholders.hpp>
+
+#include "myasquo/Myasquo.h"
 
 namespace {
 std::string path_to_filename(const std::string& path) {
