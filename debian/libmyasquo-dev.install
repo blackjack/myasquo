@@ -1,5 +1,4 @@
 /usr/include
-/usr/lib/cmake
-/usr/lib/pkgconfig
-/usr/lib/libmyasquo*.so
-/usr/share/doc/*/examples /usr/share/doc/libmyasquo-dev/
+/usr/lib/*/cmake
+/usr/lib/*/pkgconfig
+/usr/lib/*/libmyasquo*.so
