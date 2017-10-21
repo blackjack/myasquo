@@ -1,8 +1,8 @@
 #ifndef DBQUEUE_H
 #define DBQUEUE_H
+#include <cerrno>
 #include <fstream>
 #include <boost/thread/mutex.hpp>
-#include <errno.h>
 
 class DBQueue
 {

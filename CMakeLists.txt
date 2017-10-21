@@ -1,5 +1,5 @@
 CMAKE_MINIMUM_REQUIRED(VERSION 2.6)
-SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules)
+SET(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
 PROJECT(myasquo CXX)
 string(TOUPPER ${PROJECT_NAME} PROJECT_NAME_UPPER)
@@ -10,6 +10,7 @@ set(LIB_PATCH_VERSION "2")
 
 set(LIB_VERSION_STRING "${LIB_MAJOR_VERSION}.${LIB_MINOR_VERSION}.${LIB_PATCH_VERSION}")
 
+include(GNUInstallDirs)
 
 # compile in release with debug info mode by default
 IF(NOT CMAKE_BUILD_TYPE)
@@ -48,15 +49,10 @@ IF(MYASQUO_VERBOSE_DEBUG_OUTPUT)
 endif(MYASQUO_VERBOSE_DEBUG_OUTPUT)
 
 
-# Path definitions
-SET(LIB_SUFFIX "" CACHE STRING "Define suffix of directory name (32/64)" )
-SET(LIB_INSTALL_DIR     "${CMAKE_INSTALL_PREFIX}/lib${LIB_SUFFIX}" CACHE STRING "Directory where lib will install")
-SET(INCLUDE_INSTALL_DIR "${CMAKE_INSTALL_PREFIX}/include" CACHE PATH "The directory the headers are installed in")
-SET(DOC_INSTALL_DIR     "${CMAKE_INSTALL_PREFIX}/share/doc/${PROJECT_NAME}" CACHE PATH "Path to the documentation")
-SET(LIBRARY_OUTPUT_PATH "${CMAKE_BINARY_DIR}/lib${LIB_SUFFIX}")
-
-SET(CMAKE_MODULES_INSTALL_DIR "${CMAKE_ROOT}/Modules" CACHE PATH "The directory to install Findmyasquo.cmake to")
-
+include_directories(include)
+install(DIRECTORY include/${PROJECT_NAME}
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    COMPONENT dev)
 
 # Subdirs
 add_subdirectory(src)
@@ -71,7 +67,7 @@ EXPORT( PACKAGE ${PROJECT_NAME} )
 # See https://cmake.org/pipermail/cmake/2015-April/060350.html for more
 # details.
 
-SET(CMAKECONFIG_INSTALL_DIR lib/cmake/${PROJECT_NAME})
+SET(CMAKE_INSTALL_CMAKECONF ${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME})
 CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}-config.cmake.in
                ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake.pre
                @ONLY)
@@ -84,7 +80,7 @@ CONFIGURE_FILE(${CMAKE_CURRENT_SOURCE_DIR}/${PROJECT_NAME}-config-version.cmake.
                @ONLY)
 INSTALL(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config.cmake
               ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake
-              DESTINATION ${CMAKECONFIG_INSTALL_DIR})
+              DESTINATION ${CMAKE_INSTALL_CMAKECONF})
 
 
 # pkg-config
@@ -93,7 +89,7 @@ IF (NOT WIN32)
         ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
         @ONLY)
     INSTALL (FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}.pc
-        DESTINATION ${LIB_INSTALL_DIR}/pkgconfig)
+        DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)
 ENDIF (NOT WIN32)
 
 # Custom target to uninstall library and supplementary files

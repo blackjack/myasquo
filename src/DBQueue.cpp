@@ -1,6 +1,7 @@
-#include "DBQueue.h"
-#include "string.h"
-#include "boost/filesystem.hpp"
+#include <string>
+#include <boost/filesystem.hpp>
+
+#include "myasquo/DBQueue.h"
 
 DBQueue::DBQueue():
     m_seek(0),m_isOpen(false)

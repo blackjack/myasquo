@@ -5,4 +5,4 @@ if(MYASQUO_BUILD_EXAMPLES)
 endif()
 
 install(FILES example.cpp
-    DESTINATION ${DOC_INSTALL_DIR}/examples)
+    DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
